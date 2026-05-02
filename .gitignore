@@ -1,0 +1,25 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+.venv/
+venv/
+env/
+
+.env
+*.local
+
+# LanceDB 本地数据库
+utils/zua_lancedb/
+
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db

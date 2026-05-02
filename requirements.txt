@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+openai
+lancedb
+pandas
+langchain-text-splitters
+neo4j
+sqlalchemy
+pymysql

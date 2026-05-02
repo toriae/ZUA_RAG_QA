@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ZUA 智能招生助手</title>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <script type="text/javascript">
+        window._AMapSecurityConfig = {
+            securityJsCode: 'your_amap_security_js_code',
+        }
+    </script>
+    <script type="text/javascript" src="https://webapi.amap.com/maps?v=2.0&key=your_amap_key"></script>
+
+    <style>
+        :root {
+            --bg-color: #f3f4f6;
+            --chat-bg: #ffffff;
+            --primary: #0f172a;
+            --border-color: #e5e7eb;
+            --text-main: #374151;
+            --text-muted: #6b7280;
+            --zua-blue: #0056b3;
+            --zua-blue-hover: #004494;
+            --user-bubble: #0056b3;
+            --ai-bubble: #ffffff;
+            --sidebar-width: 260px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+
+        body { display: flex; height: 100vh; overflow: hidden; background-color: var(--chat-bg); color: var(--text-main); }
+
+        /* ================= 侧边栏 ================= */
+        .sidebar {
+            width: var(--sidebar-width); flex-shrink: 0; background-color: #f9fafb; border-right: 1px solid var(--border-color);
+            display: flex; flex-direction: column; transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 100;
+        }
+        .sidebar.collapsed { margin-left: calc(var(--sidebar-width) * -1); }
+
+        .sidebar-header { padding: 20px; }
+        .new-chat-btn {
+            width: 100%; display: flex; align-items: center; gap: 8px; padding: 12px 16px;
+            background: white; border: 1px solid var(--border-color); border-radius: 8px;
+            color: var(--primary); font-weight: 500; cursor: pointer; transition: all 0.2s;
+        }
+        .new-chat-btn:hover { border-color: var(--zua-blue); color: var(--zua-blue); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+
+        .nav-menu { flex: 1; padding: 0 12px; overflow-y: auto; }
+        .nav-group-title { font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; margin: 20px 8px 8px; letter-spacing: 0.5px; }
+        .nav-item {
+            display: flex; align-items: center; gap: 12px; padding: 10px 12px; margin-bottom: 4px;
+            color: var(--text-main); text-decoration: none; border-radius: 6px; cursor: pointer; transition: 0.2s; font-size: 14px;
+        }
+        .nav-item:hover { background-color: #f3f4f6; color: var(--zua-blue); }
+        .nav-item svg { width: 18px; height: 18px; opacity: 0.7; }
+
+        .sidebar-overlay {
+            display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5); z-index: 99; opacity: 0; transition: opacity 0.3s;
+        }
+
+        /* ================= 弹窗样式 (Modal) ================= */
+        .modal-overlay {
+            display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(4px);
+            z-index: 1000; align-items: center; justify-content: center;
+            opacity: 0; transition: opacity 0.3s;
+        }
+        .modal-overlay.active { display: flex; opacity: 1; }
+
+        .modal-box {
+            background: white; width: 90%; max-width: 400px; border-radius: 16px;
+            padding: 24px; box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            transform: translateY(20px); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* 地图专属的大尺寸弹窗样式 */
+        .map-modal-box {
+            max-width: 900px; /* 地图弹窗需要更宽 */
+            width: 95%;
+            height: 80vh; /* 占据屏幕80%高度 */
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+        }
+
+        .modal-overlay.active .modal-box { transform: translateY(0); }
+
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .modal-header h3 { font-size: 18px; color: var(--primary); display: flex; align-items: center; gap: 8px; }
+        .modal-header svg { width: 20px; height: 20px; color: var(--zua-blue); }
+        .close-btn { background: none; border: none; font-size: 24px; color: #9ca3af; cursor: pointer; line-height: 1; transition: 0.2s; }
+        .close-btn:hover { color: #ef4444; }
+
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; font-size: 14px; font-weight: 500; margin-bottom: 8px; color: var(--text-main); }
+        .form-group select {
+            width: 100%; padding: 12px; border: 1px solid var(--border-color);
+            border-radius: 8px; font-size: 15px; outline: none; background: #f9fafb; cursor: pointer;
+            transition: border-color 0.2s; appearance: none;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat: no-repeat; background-position: right 12px center; background-size: 16px;
+        }
+        .form-group select:focus { border-color: var(--zua-blue); background-color: white; box-shadow: 0 0 0 3px rgba(0,86,179,0.1); }
+
+        .modal-footer { margin-top: 24px; display: flex; justify-content: flex-end; gap: 12px; }
+        .btn { padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; transition: 0.2s; border: none; }
+        .btn-cancel { background: #f3f4f6; color: var(--text-main); }
+        .btn-cancel:hover { background: #e5e7eb; }
+        .btn-submit { background: var(--zua-blue); color: white; }
+        .btn-submit:hover { background: var(--zua-blue-hover); }
+
+        /* ================= 主体内容 ================= */
+        .main-content { flex: 1; display: flex; flex-direction: column; position: relative; width: 100%; min-width: 0; }
+
+        .header {
+            height: 60px; padding: 0 20px; display: flex; align-items: center; justify-content: space-between;
+            border-bottom: 1px solid transparent; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(8px); z-index: 10;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .header.compact { height: 48px; border-bottom: 1px solid var(--border-color); box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+        .header.compact .school-logo { width: 26px; height: 26px; }
+        .header.compact h1 { font-size: 15px; }
+
+        .header-left { display: flex; align-items: center; gap: 12px; }
+        .menu-toggle { background: none; border: none; cursor: pointer; color: var(--text-main); padding: 4px; display: flex; align-items: center; justify-content: center; border-radius: 6px; transition: background 0.2s; }
+        .menu-toggle:hover { background: #f3f4f6; }
+        .school-logo { width: 34px; height: 34px; object-fit: contain; border-radius: 50%; border: 1px solid #eee; transition: all 0.4s ease; }
+        .header h1 { font-size: 17px; font-weight: 600; color: var(--primary); transition: all 0.4s ease; }
+
+        .chat-container { flex: 1; overflow-y: auto; padding: 20px 0; background-color: var(--bg-color); scroll-behavior: smooth; }
+
+        .message-row { display: flex; max-width: 880px; margin: 0 auto; padding: 10px 20px; gap: 16px; align-items: flex-start; }
+        .message-row.user { flex-direction: row-reverse; }
+        .message-row.user .avatar { background-color: #10a37f; color: white; }
+        .message-row.user .message-content { background-color: var(--user-bubble); color: white; border-radius: 16px 4px 16px 16px; padding: 12px 16px; max-width: 75%; }
+        .message-row.ai { flex-direction: row; }
+        .message-row.ai .avatar { background-color: white; border: 1px solid var(--border-color); }
+        .message-row.ai .avatar img { width: 100%; height: 100%; border-radius: 6px; object-fit: cover; }
+        .message-row.ai .message-content { background-color: var(--ai-bubble); color: var(--text-main); border-radius: 4px 16px 16px 16px; padding: 16px; max-width: 85%; box-shadow: 0 2px 5px rgba(0,0,0,0.02); border: 1px solid rgba(0,0,0,0.05); }
+
+        .avatar { width: 36px; height: 36px; border-radius: 8px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; }
+        .message-content { font-size: 15px; line-height: 1.7; overflow-x: auto; word-wrap: break-word; }
+
+        .message-content table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14px; }
+        .message-content th { background: #f8fafc; padding: 10px; text-align: left; border: 1px solid var(--border-color); color: var(--zua-blue); font-weight: 600; white-space: nowrap; }
+        .message-content td { padding: 10px; border: 1px solid var(--border-color); }
+        .message-content tr:nth-child(even) { background-color: #f9fafb; }
+        .message-content ul, .message-content ol { padding-left: 20px; margin: 10px 0; }
+        .message-content p { margin-bottom: 10px; }
+        .message-content p:last-child { margin-bottom: 0; }
+        /* 限制聊天内容中的图片大小 */
+        .message-content img {
+            max-width: 48%;       /* 限制最大宽度为聊天框的一半不到，留出缝隙 */
+            width: auto;
+            height: auto;
+            border-radius: 8px;   /* 圆角 */
+            margin: 4px 1%;       /* 上下 4px，左右 1% 的间距 */
+            display: inline-block;/* 【关键】从 block 改为 inline-block，允许并排 */
+            vertical-align: top;  /* 顶部对齐，防止高度不同的图片参差不齐 */
+            object-fit: cover;    /* 保证图片按比例缩放不变形 */
+        }
+        /* 针对移动端的优化：屏幕太小时恢复上下排列（可选） */
+        @media (max-width: 480px) {
+            .message-content img {
+                max-width: 100%;
+                margin: 8px 0;
+                display: block;
+            }
+        }
+        .message-row.user .message-content strong { color: white; }
+
+        .input-area { background: var(--bg-color); padding: 20px; }
+        .input-wrapper { max-width: 840px; margin: 0 auto; position: relative; }
+        .input-box {
+            background: white; border: 1px solid #d1d5db; border-radius: 16px; display: flex; padding: 8px 12px 8px 16px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05); align-items: center; transition: border-color 0.2s;
+        }
+        .input-box:focus-within { border-color: var(--zua-blue); box-shadow: 0 4px 12px rgba(0, 86, 179, 0.1); }
+        .input-box input { flex: 1; border: none; outline: none; font-size: 15px; background: transparent; padding: 8px 0; }
+
+        .send-btn {
+            background: var(--zua-blue); color: white; border: none; width: 36px; height: 36px; border-radius: 10px;
+            cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s;
+        }
+        .send-btn:hover:not(:disabled) { background: var(--zua-blue-hover); }
+        .send-btn:disabled { background: #e5e7eb; cursor: not-allowed; }
+        .send-btn svg { width: 18px; height: 18px; fill: currentColor; }
+
+        .disclaimer { text-align: center; font-size: 12px; color: #9ca3af; margin-top: 10px; }
+        .cursor { display: inline-block; width: 6px; height: 15px; background-color: var(--text-main); animation: blink 1s step-end infinite; vertical-align: middle; margin-left: 2px; }
+        @keyframes blink { 50% { opacity: 0; } }
+
+        .welcome-screen { max-width: 800px; margin: 40px auto; text-align: center; padding: 20px; }
+        .welcome-screen h2 { color: var(--primary); margin-bottom: 20px; }
+        .quick-tags { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+        .tag-btn { background: white; border: 1px solid var(--border-color); padding: 8px 16px; border-radius: 20px; color: var(--text-main); cursor: pointer; transition: 0.2s; font-size: 14px; }
+        .tag-btn:hover { border-color: var(--zua-blue); color: var(--zua-blue); }
+
+        @media (max-width: 768px) {
+            .sidebar { position: fixed; margin-left: calc(var(--sidebar-width) * -1); height: 100%; box-shadow: 4px 0 15px rgba(0,0,0,0.05); }
+            .sidebar.active { margin-left: 0; }
+            .sidebar-overlay.active { display: block; opacity: 1; }
+            .message-row { max-width: 100%; padding: 10px 12px; gap: 10px; }
+            .message-row.user .message-content { max-width: 85%; }
+            .message-row.ai .message-content { max-width: 90%; padding: 12px; }
+            .input-area { padding: 12px; }
+
+            /* 手机端地图高度调整 */
+            .map-modal-box { height: 70vh; }
+        }
+        /* ================= 文档阅读视图 ================= */
+        .document-container {
+            display: none; /* 默认隐藏 */
+            flex: 1;
+            overflow-y: auto;
+            padding: 30px 20px;
+            background-color: var(--chat-bg);
+            scroll-behavior: smooth;
+        }
+        .document-content {
+            max-width: 880px;
+            margin: 0 auto;
+            color: var(--text-main);
+        }
+        /* 适配 Markdown 里的视频和内嵌网页 */
+        .document-content video,
+        .document-content iframe {
+            max-width: 100%;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            margin: 16px 0;
+        }
+        .document-content h1, .document-content h2, .document-content h3 {
+            color: var(--primary); margin-top: 24px; margin-bottom: 12px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
+    <div class="modal-overlay" id="scoreModal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M18 9l-5 5-4-4-4 4"/></svg>
+                    精准分数查询
+                </h3>
+                <button class="close-btn" onclick="closeScoreModal()">&times;</button>
+            </div>
+
+            <div class="form-group">
+                <label for="provinceSelect">生源所在省份</label>
+                <select id="provinceSelect">
+                    <option value="河南" selected>河南 (本省)</option>
+                    <option value="北京">北京</option>
+                    <option value="上海">上海</option>
+                    <option value="天津">天津</option>
+                    <option value="重庆">重庆</option>
+                    <option value="河北">河北</option>
+                    <option value="山西">山西</option>
+                    <option value="辽宁">辽宁</option>
+                    <option value="吉林">吉林</option>
+                    <option value="黑龙江">黑龙江</option>
+                    <option value="江苏">江苏</option>
+                    <option value="浙江">浙江</option>
+                    <option value="安徽">安徽</option>
+                    <option value="福建">福建</option>
+                    <option value="江西">江西</option>
+                    <option value="山东">山东</option>
+                    <option value="湖北">湖北</option>
+                    <option value="湖南">湖南</option>
+                    <option value="广东">广东</option>
+                    <option value="海南">海南</option>
+                    <option value="四川">四川</option>
+                    <option value="贵州">贵州</option>
+                    <option value="云南">云南</option>
+                    <option value="陕西">陕西</option>
+                    <option value="甘肃">甘肃</option>
+                    <option value="青海">青海</option>
+                    <option value="内蒙古">内蒙古</option>
+                    <option value="广西">广西</option>
+                    <option value="西藏">西藏</option>
+                    <option value="宁夏">宁夏</option>
+                    <option value="新疆">新疆</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="yearSelect">招生年份</label>
+                <select id="yearSelect">
+                    <option value="2025" selected>2025年</option>
+                    <option value="2024">2024年</option>
+                    <option value="2023">2023年</option>
+                    <option value="2022">2022年</option>
+                    <option value="2021">2021年</option>
+                </select>
+            </div>
+
+            <div class="modal-footer">
+                <button class="btn btn-cancel" onclick="closeScoreModal()">取消</button>
+                <button class="btn btn-submit" onclick="submitScoreModal()">查询数据</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="mapModal">
+        <div class="modal-box map-modal-box">
+            <div class="modal-header">
+                <h3>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                    ZUA 校园地图
+                </h3>
+                <button class="close-btn" onclick="closeMapModal()">&times;</button>
+            </div>
+            <div id="amapContainer" style="flex: 1; width: 100%; border-radius: 8px; border: 1px solid #e5e7eb;"></div>
+        </div>
+    </div>
+
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <button class="new-chat-btn" onclick="startNewChat()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+                新建咨询
+            </button>
+        </div>
+        <nav class="nav-menu">
+            <div class="nav-group-title">热门问题百科</div>
+            <a class="nav-item" onclick="sendQuery('你们学校有哪些航空特色专业？请推荐几个。')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
+                优势专业推荐
+            </a>
+
+            <a class="nav-item" onclick="openScoreModal()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M18 9l-5 5-4-4-4 4"/></svg>
+                历年分数查询
+            </a>
+
+            <a class="nav-item" onclick="sendQuery('请介绍一下宿舍条件、几人间、有空调吗？')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
+                寝室环境
+            </a>
+            <a class="nav-item" onclick="sendQuery('学校的奖学金、助学金政策是怎样的？')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="7"></circle><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"></polyline></svg>
+                奖助学金政策
+            </a>
+
+            <div class="nav-group-title">官方指南</div>
+
+            <a class="nav-item" onclick="openMapModal()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                校园地图
+            </a>
+
+            <a href="https://zsxxw.zua.edu.cn" target="_blank" class="nav-item">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                访问招生信息网
+            </a>
+            <div class="nav-group-title">友情链接</div>
+            <a class="nav-item" onclick="loadMarkdownDocument('brochure.md', '招生章程')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                招生章程
+            </a>
+            <a class="nav-item" onclick="loadMarkdownDocument('videos.md', '映像郑航')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect><line x1="7" y1="2" x2="7" y2="22"></line><line x1="17" y1="2" x2="17" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line><line x1="2" y1="7" x2="7" y2="7"></line><line x1="2" y1="17" x2="7" y2="17"></line><line x1="17" y1="17" x2="22" y2="17"></line><line x1="17" y1="7" x2="22" y2="7"></line></svg>
+                映像郑航
+            </a>
+            <a href="https://wiki.zua.fan" target="_blank" class="nav-item">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+                郑航百科全书
+            </a>
+        </nav>
+    </aside>
+
+    <main class="main-content">
+        <header class="header" id="mainHeader">
+            <div class="header-left">
+                <button class="menu-toggle" onclick="toggleSidebar()">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                </button>
+                <img src="./img.png" alt="ZUA Logo" class="school-logo">
+                <h1>ZUA 招生智能问答助手</h1>
+            </div>
+        </header>
+
+        <div class="chat-container" id="chatbox">
+            <div class="welcome-screen" id="welcomeScreen">
+                <h2>欢迎咨询郑州航院</h2>
+                <div class="quick-tags">
+                    <button class="tag-btn" onclick="openScoreModal()">历年分数查询</button>
+                    <button class="tag-btn" onclick="sendQuery('计算机科学与技术专业属于哪个学院？')">王牌专业解读</button>
+                    <button class="tag-btn" onclick="sendQuery('介绍一下学校')">介绍学校</button>
+                </div>
+            </div>
+        </div>
+        <div class="document-container" id="docContainer">
+            <div id="docContent" class="message-content document-content"></div>
+        </div>
+
+        <div class="input-area" id="inputArea">
+            <div class="input-wrapper">
+                <div class="input-box">
+                    <input type="text" id="userInput" placeholder="输入你想了解的招生问题..." onkeypress="handleKeyPress(event)">
+                    <button class="send-btn" id="sendBtn" onclick="sendQuery()">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+                    </button>
+                </div>
+                <div class="disclaimer">AI 生成内容仅供参考，录取政策及分数线请以各省教育考试院及 ZUA 招生网为准。</div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const API_URL = 'http://127.0.0.1:8012/v1/chat/completions';
+        let messageHistory = [];
+        let hasStartedChat = false;
+        let amapInstance = null; // 全局地图实例变量
+
+        // --- 侧边栏逻辑 ---
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+
+            if (window.innerWidth <= 768) {
+                sidebar.classList.toggle('active');
+                overlay.classList.toggle('active');
+            } else {
+                sidebar.classList.toggle('collapsed');
+            }
+        }
+
+        // --- 分数查询弹窗逻辑 ---
+        function openScoreModal() {
+            if(window.innerWidth <= 768) {
+                document.getElementById('sidebar').classList.remove('active');
+                document.getElementById('sidebarOverlay').classList.remove('active');
+            }
+            const modal = document.getElementById('scoreModal');
+            modal.style.display = 'flex';
+            setTimeout(() => modal.classList.add('active'), 10);
+        }
+
+        function closeScoreModal() {
+            const modal = document.getElementById('scoreModal');
+            modal.classList.remove('active');
+            setTimeout(() => modal.style.display = 'none', 300);
+        }
+
+        function submitScoreModal() {
+            const prov = document.getElementById('provinceSelect').value;
+            const year = document.getElementById('yearSelect').value;
+            closeScoreModal();
+
+            const query = `请查询 ${year}年 ${prov} 考生分数数据。要求列出完整数据包括年份、省市、类型、科类、专业、录取人数、最低分、平均分、最高分、备注。`;
+            sendQuery(query);
+        }
+
+        // --- 地图弹窗逻辑 (核心) ---
+        function openMapModal() {
+            // 如果在手机端，点击后先收起侧边栏
+            if(window.innerWidth <= 768) {
+                document.getElementById('sidebar').classList.remove('active');
+                document.getElementById('sidebarOverlay').classList.remove('active');
+            }
+            const modal = document.getElementById('mapModal');
+            modal.style.display = 'flex';
+
+            setTimeout(() => {
+                modal.classList.add('active');
+
+                // 仅在第一次打开时初始化地图
+                if (!amapInstance) {
+                    // 郑州航空工业管理学院(龙子湖校区)大致经纬度
+                    const zuaPosition = [113.7864966, 34.786103];
+
+                    amapInstance = new AMap.Map('amapContainer', {
+                        zoom: 15,
+                        center: zuaPosition,
+                        viewMode: '2D', // 也可改为 '3D' 体验立体感
+                    });
+
+                    // 加上一个官方小图钉定位点
+                    const marker = new AMap.Marker({
+                        position: zuaPosition,
+                        title: '郑州航空工业管理学院(龙子湖校区)'
+                    });
+                    amapInstance.add(marker);
+                } else {
+                    // 由于弹窗是由 display: none 变出来的，需触发 resize 让地图重新计算尺寸，防止空白报错
+                    amapInstance.resize();
+                }
+            }, 10);
+        }
+
+        function closeMapModal() {
+            const modal = document.getElementById('mapModal');
+            modal.classList.remove('active');
+            setTimeout(() => modal.style.display = 'none', 300);
+        }
+
+        // --- 聊天核心逻辑 ---
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') sendQuery();
+        }
+
+        function startNewChat() {
+            showChatView(); // 新增这一行
+            messageHistory = [];
+            hasStartedChat = false;
+            document.getElementById('mainHeader').classList.remove('compact');
+            document.getElementById('chatbox').innerHTML = `
+                <div class="welcome-screen" id="welcomeScreen">
+                    <h2>欢迎咨询郑州航院</h2>
+                    <div class="quick-tags">
+                        <button class="tag-btn" onclick="openScoreModal()">历年分数查询</button>
+                        <button class="tag-btn" onclick="sendQuery('计算机科学与技术专业属于哪个学院？')">王牌专业解读</button>
+                        <button class="tag-btn" onclick="sendQuery('介绍一下学校')">介绍学校</button>
+                    </div>
+                </div>
+            `;
+            if(window.innerWidth <= 768) toggleSidebar();
+        }
+
+        function appendMessageRow(role, content) {
+            const chatbox = document.getElementById('chatbox');
+            const row = document.createElement('div');
+            row.className = `message-row ${role}`;
+
+            const avatar = document.createElement('div');
+            avatar.className = `avatar`;
+            if (role === 'ai') {
+                avatar.innerHTML = `<img src="./img.png" alt="ZUA">`;
+            } else {
+                avatar.textContent = '我';
+            }
+
+            const msgContent = document.createElement('div');
+            msgContent.className = 'message-content';
+
+            if (content) {
+                msgContent.innerHTML = role === 'user' ? content : marked.parse(content);
+            }
+
+            row.appendChild(avatar);
+            row.appendChild(msgContent);
+            chatbox.appendChild(row);
+
+            chatbox.scrollTo({ top: chatbox.scrollHeight, behavior: 'smooth' });
+            return msgContent;
+        }
+
+        async function sendQuery(queryText) {
+            showChatView(); // 新增这一行
+            const inputEl = document.getElementById('userInput');
+            const text = queryText || inputEl.value.trim();
+            if (!text) return;
+
+            if (!hasStartedChat) {
+                document.getElementById('mainHeader').classList.add('compact');
+                hasStartedChat = true;
+            }
+
+            if(window.innerWidth <= 768 && document.getElementById('sidebar').classList.contains('active')) {
+                toggleSidebar();
+            }
+
+            const welcome = document.getElementById('welcomeScreen');
+            if (welcome) welcome.style.display = 'none';
+
+            inputEl.value = '';
+            document.getElementById('sendBtn').disabled = true;
+
+            appendMessageRow('user', text);
+            messageHistory.push({ role: "user", content: text });
+
+            const aiContentEl = appendMessageRow('ai', '');
+            aiContentEl.innerHTML = '<span class="cursor"></span>';
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        model: "default",
+                        messages: messageHistory,
+                        temperature: 0.2,
+                        stream: true
+                    })
+                });
+
+                if (!response.ok) throw new Error('网络请求失败');
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder("utf-8");
+                let aiFullText = "";
+                let buffer = "";
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop();
+
+                    for (let line of lines) {
+                        line = line.trim();
+                        if (line.startsWith('data: ')) {
+                            const jsonStr = line.substring(6);
+                            if (jsonStr === '[DONE]') break;
+
+                            try {
+                                const data = JSON.parse(jsonStr);
+                                const token = data.choices[0].delta.content;
+                                if (token) {
+                                    aiFullText += token;
+                                    aiContentEl.innerHTML = marked.parse(aiFullText) + '<span class="cursor"></span>';
+
+                                    const chatbox = document.getElementById('chatbox');
+                                    chatbox.scrollTop = chatbox.scrollHeight;
+                                }
+                            } catch (e) {
+                                console.error("解析流式片段失败", e);
+                            }
+                        }
+                    }
+                }
+
+                aiContentEl.innerHTML = marked.parse(aiFullText);
+                messageHistory.push({ role: "assistant", content: aiFullText });
+
+                if (messageHistory.length > 6) {
+                    messageHistory = messageHistory.slice(-6);
+                }
+
+            } catch (error) {
+                console.error(error);
+                aiContentEl.innerHTML = "抱歉，系统响应异常，请确保后端服务已启动并稍后重试。";
+            } finally {
+                document.getElementById('sendBtn').disabled = false;
+                inputEl.focus();
+            }
+        }
+        // --- 视图切换逻辑 ---
+        function showChatView() {
+            document.getElementById('chatbox').style.display = 'block';
+            document.getElementById('inputArea').style.display = 'block';
+            document.getElementById('docContainer').style.display = 'none';
+            document.querySelector('#mainHeader h1').textContent = 'ZUA 招生智能问答助手';
+        }
+
+        // --- 加载 Markdown 文档逻辑 ---
+        async function loadMarkdownDocument(filename, title) {
+            // 手机端点击后收起侧边栏
+            if(window.innerWidth <= 768 && document.getElementById('sidebar').classList.contains('active')) {
+                toggleSidebar();
+            }
+
+            // 切换到文档视图
+            document.getElementById('chatbox').style.display = 'none';
+            document.getElementById('inputArea').style.display = 'none';
+            document.getElementById('docContainer').style.display = 'block';
+
+            // 修改顶部标题栏
+            document.querySelector('#mainHeader h1').textContent = title;
+            document.getElementById('mainHeader').classList.add('compact');
+
+            const docContent = document.getElementById('docContent');
+            docContent.innerHTML = '<div style="text-align:center; padding: 50px; color: #666;">加载中...</div>';
+
+            try {
+                // 通过 fetch 读取本地或服务器上的 md 文件
+                const response = await fetch(`./${filename}`);
+                if (!response.ok) throw new Error('文件未找到');
+                let mdText = await response.text();
+
+                // 兼容处理 VuePress/VitePress 的特殊语法
+                mdText = mdText.replace(/<Badge.*?\/>/g, ''); // 移除 Badge 标签
+                mdText = mdText.replace(/\[\[toc\]\]/g, ''); // 移除目录宏
+                // 将 ::: warning 这种块转换成标准的 Markdown 引用块
+                mdText = mdText.replace(/::: (warning|tip|details)(.*)\n([\s\S]*?):::/g, function(match, type, title, content) {
+                    const blockTitle = title.trim() || (type === 'warning' ? '注意' : '提示');
+                    return `> **${blockTitle}**\n> \n> ${content.trim().split('\n').join('\n> ')}\n`;
+                });
+
+                docContent.innerHTML = marked.parse(mdText);
+            } catch (error) {
+                console.error(error);
+                docContent.innerHTML = `<div style="text-align:center; padding: 50px; color: red;">加载失败：无法读取 ${filename}。<br>请确保文件已放在 web 根目录下。</div>`;
+            }
+        }
+    </script>
+</body>
+</html>
