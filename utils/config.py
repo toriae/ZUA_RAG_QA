@@ -1,4 +1,3 @@
-
 """
 ZUA 招生助手 - 统一配置文件
 所有路径均使用相对路径，基于项目根目录自动计算。
@@ -6,18 +5,19 @@ ZUA 招生助手 - 统一配置文件
 import os
 
 # ==========================================
-# 项目根目录
+# 项目根目录 (E:\rag_zua)
 # ==========================================
 # utils/ 的上级目录即为项目根目录
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # ==========================================
-# 数据路径
+# 输入数据路径
 # ==========================================
-DATA_DIR = os.path.join(PROJECT_ROOT, "data")
-DATA_TXT_PATH = os.path.join(DATA_DIR, "data.txt")
-XUEYUAN_TXT_PATH = os.path.join(DATA_DIR, "xueyuan.txt")
-CSV_DIR = os.path.join(DATA_DIR, "csv")
+INPUT_DIR = os.path.join(PROJECT_ROOT, "data")
+DATA_TXT_PATH = os.path.join(INPUT_DIR, "data.txt")
+DATA_MD_PATH = os.path.join(INPUT_DIR, "data.md")
+XUEYUAN_TXT_PATH = os.path.join(INPUT_DIR, "xueyuan.txt")
+XUEYUAN_MD_PATH = os.path.join(INPUT_DIR, "xueyuan.md")
 
 # ==========================================
 # LanceDB 配置
@@ -52,7 +52,4 @@ NEO4J_PASSWORD = os.environ.get("ZUA_NEO4J_PASSWORD", "your_password")
 # ==========================================
 # 文本切分参数
 # ==========================================
-CHUNK_SIZE_LANCEDB = 1200
-CHUNK_OVERLAP_LANCEDB = 100
-CHUNK_SIZE_NEO4J = 3000
 SLEEP_BETWEEN_CHUNKS = 0.01

@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import time
 from openai import OpenAI
@@ -7,8 +8,8 @@ from neo4j import GraphDatabase
 from config import (
     API_KEY, BASE_URL, CHAT_MODEL,
     NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD,
-    XUEYUAN_TXT_PATH,
-    CHUNK_SIZE_NEO4J, SLEEP_BETWEEN_CHUNKS,
+    XUEYUAN_MD_PATH,
+    SLEEP_BETWEEN_CHUNKS,
 )
 
 # ==========================================
@@ -152,17 +153,26 @@ def write_to_neo4j(tx, graph_data):
 # 6. 主执行流：分块读取、提取、合并、入库
 # ==========================================
 def main():
-    if not os.path.exists(XUEYUAN_TXT_PATH):
-        print(f"❌ 数据文件不存在: {XUEYUAN_TXT_PATH}")
+    if not os.path.exists(XUEYUAN_MD_PATH):
+        print(f"❌ 数据文件不存在: {XUEYUAN_MD_PATH}")
         return
 
-    with open(XUEYUAN_TXT_PATH, "r", encoding="utf-8") as f:
+    with open(XUEYUAN_MD_PATH, "r", encoding="utf-8") as f:
         full_text = f.read()
 
+    # 按一级标题 (# ) 切分，每个学院一个 chunk
+    pattern = r'^# (.+)$'
+    splits = re.split(pattern, full_text, flags=re.MULTILINE)
+
     chunks = []
-    for i in range(0, len(full_text), CHUNK_SIZE_NEO4J):
-        chunks.append(full_text[i:i+CHUNK_SIZE_NEO4J])
-    print(f"📄 总文本长度: {len(full_text)} 字符, 分为 {len(chunks)} 块")
+    for i in range(1, len(splits), 2):
+        title = splits[i].strip()
+        body = splits[i + 1].strip() if i + 1 < len(splits) else ""
+        chunk_text = f"# {title}\n\n{body}"
+        if chunk_text.strip():
+            chunks.append(chunk_text)
+
+    print(f"📄 按一级标题切分为 {len(chunks)} 个学院块")
 
     all_extracted = []
     for idx, chunk in enumerate(chunks):

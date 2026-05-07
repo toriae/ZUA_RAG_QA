@@ -7,7 +7,7 @@
 - **智能意图识别**：自动判断用户问题是查分数、查专业、查政策还是闲聊
 - **历年分数查询**：支持按省份、年份、专业查询录取分数（Text-to-SQL）
 - **专业知识图谱**：查询学院、专业、学制、特色等关系数据（Text-to-Cypher）
-- **校园政策问答**：宿舍、食堂、奖助学金、转专业等生活指南（向量检索）
+- **校园政策问答**：宿舍、食堂、奖助学金、转专业等生活指南（向量检索，按 Markdown 标题分块）
 - **实拍图片展示**：根据关键词自动关联校园实拍图片（食堂、宿舍、风景等）
 - **流式响应**：SSE 流式输出，打字机效果，体验流畅
 - **前端界面**：ChatGPT 风格对话界面，支持侧边栏快捷提问、分数弹窗查询、校园地图
@@ -48,8 +48,10 @@ rag_zua/
 ├── README.md
 │
 ├── data/                       # 数据文件
-│   ├── data.txt                # 校园政策原始文本 → 向量库
-│   ├── xueyuan.txt             # 学院专业原始文本 → 知识图谱
+│   ├── data.txt                # 校园政策原始文本（保留源文件）
+│   ├── data.md                 # 校园政策 Markdown 版 → 向量库（按标题分块）
+│   ├── xueyuan.txt             # 学院专业原始文本（保留源文件）
+│   ├── xueyuan.md              # 学院专业 Markdown 版 → 知识图谱（按标题分块）
 │   └── csv/                    # 各省历年录取分数 CSV → MySQL
 │       ├── henan_1.csv
 │       ├── shandong.csv
@@ -200,24 +202,25 @@ load_dotenv()
 
 ### 步骤 1：构建向量数据库
 
-将 `data/data.txt` 切片并向量化，存入本地 LanceDB：
+将 `data/data.md` 按一级标题分块并向量化，存入本地 LanceDB：
 
 ```bash
 python utils/build_vector_db.py
 ```
 
-- 使用 LangChain 的 `RecursiveCharacterTextSplitter` 按 1200 字符切片
+- 按 Markdown 一级标题（`#`）切分，每个标题对应一个语义完整的文本块
 - 调用 `text-embedding-v4` 模型生成向量
 - 数据存储在 `utils/zua_lancedb/` 目录下（纯本地，无需额外服务）
 
 ### 步骤 2：构建知识图谱
 
-从 `data/xueyuan.txt` 中提取学院、专业、特色信息，写入 Neo4j：
+从 `data/xueyuan.md` 中按学院分块，提取学院、专业、特色信息，写入 Neo4j：
 
 ```bash
 python utils/txt_2_neo4j.py
 ```
 
+- 按一级标题（`#`）切分，每个学院作为一个独立文本块送入大模型
 - 调用 `qwen-plus` 大模型提取结构化 JSON
 - 自动合并去重，使用 `MERGE` 保证幂等（可重复运行）
 - 图谱结构：`(College)-[:CONTAINS]->(Major)-[:HAS_FEATURE]->(Feature)`
@@ -275,7 +278,13 @@ Content-Type: application/json
 
 ### Q: 启动时提示 "找不到 LanceDB 表"
 
-说明还没有构建向量数据库，先运行 `python utils/build_vector_db.py`。
+说明还没有构建向量数据库，先运行 `python utils/build_vector_db.py`。需要确保 `data/data.md` 文件存在。
+
+### Q: 修改了 data.md 或 xueyuan.md 后需要重新构建吗
+
+是的。修改后需要重新运行对应的构建脚本：
+- 修改了 `data/data.md` → 运行 `python utils/build_vector_db.py`
+- 修改了 `data/xueyuan.md` → 运行 `python utils/txt_2_neo4j.py`
 
 ### Q: MySQL 连接失败
 
@@ -313,6 +322,7 @@ Content-Type: application/json
 | 向量数据库 | LanceDB | 本地向量检索（零配置） |
 | 关系数据库 | MySQL | 历年录取分数存储 |
 | 图数据库 | Neo4j | 学院-专业知识图谱 |
+| 文本切分 | 按 Markdown 标题分块（正则 `^#`） | 替代固定字符切分，语义完整性更好 |
 | 前端 | 原生 HTML/CSS/JS + Marked.js | ChatGPT 风格对话界面 |
 | 地图 | 高德地图 JS API | 校园地图展示 |
 
@@ -321,4 +331,4 @@ Content-Type: application/json
 - [阿里云百炼平台](https://bailian.console.aliyun.com/) — 提供大模型 API
 - [LanceDB](https://lancedb.com/) — 轻量级本地向量数据库
 - [Neo4j](https://neo4j.com/) — 图数据库
-- [LangChain](https://www.langchain.com/) — 文本切分工具
+- [LangChain](https://www.langchain.com/) — 早期版本使用其文本切分工具（已替换为基于 Markdown 标题的自定义分块）
