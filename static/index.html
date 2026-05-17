@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ZUA 智能招生助手</title>
+    <link rel="icon" href="./img.png" type="image/png">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script type="text/javascript">
+        window._AMapSecurityConfig = {
+            securityJsCode: '64cf269e545823bd2a687353e2c1e41e',
+        }
+    </script>
+    <script type="text/javascript" src="https://webapi.amap.com/maps?v=2.0&key=a7204a0e159abef06c12ef6e7f85f0f4"></script>
+    <style>
+:root {
+    --bg: #f0f2f5; --chat-bg: #ffffff; --ai-bg: #ffffff; --primary: #0f172a;
+    --border: #e2e5ea; --text: #1d2129; --text-secondary: #646a73;
+    --blue: #1677ff; --blue-hover: #0e5fd8; --blue-light: #e6f0ff;
+    --user-from: #1677ff; --user-to: #4096ff;
+    --sidebar-w: 260px; --radius: 12px; --shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { display: flex; font-family: -apple-system, "SF Pro Text", "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif; height: 100vh; overflow: hidden; background: var(--bg); color: var(--text); }
+.sidebar { width: var(--sidebar-w); flex-shrink: 0; background: #fafbfc; border-right: 1px solid var(--border); display: flex; flex-direction: column; transition: margin-left 0.3s ease; z-index: 100; }
+.sidebar.collapsed { margin-left: calc(var(--sidebar-w) * -1); }
+.sidebar-header { padding: 16px; }
+.new-chat-btn { width: 100%; display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: #fff; border: 1px solid var(--border); border-radius: 8px; color: var(--primary); font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s; }
+.new-chat-btn:hover { border-color: var(--blue); color: var(--blue); box-shadow: var(--shadow); }
+.nav-menu { flex: 1; padding: 0 10px; overflow-y: auto; }
+.nav-group-title { font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; margin: 16px 8px 6px; letter-spacing: 0.5px; }
+.nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 10px; margin-bottom: 2px; color: var(--text); text-decoration: none; border-radius: 6px; cursor: pointer; transition: 0.15s; font-size: 13px; }
+.nav-item:hover { background: #eef1f5; color: var(--blue); }
+.nav-item svg { width: 16px; height: 16px; opacity: 0.65; flex-shrink: 0; }
+.sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 99; }
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.35); backdrop-filter: blur(3px); z-index: 1000; align-items: center; justify-content: center; }
+.modal-overlay.active { display: flex; }
+.modal-box { background: #fff; width: 90%; max-width: 400px; border-radius: 14px; padding: 22px; box-shadow: 0 12px 32px rgba(0,0,0,0.12); animation: modalIn 0.25s ease forwards; }
+@keyframes modalIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+.map-modal-box { max-width: 900px; width: 95%; height: 80vh; display: flex; flex-direction: column; padding: 18px; }
+.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
+.modal-header h3 { font-size: 16px; color: var(--primary); display: flex; align-items: center; gap: 6px; }
+.modal-header svg { width: 18px; height: 18px; color: var(--blue); }
+.close-btn { background: none; border: none; font-size: 22px; color: #999; cursor: pointer; padding: 0 4px; }
+.close-btn:hover { color: #e53e3e; }
+.form-group { margin-bottom: 14px; }
+.form-group label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; }
+.form-group select { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; outline: none; background: #f8f9fb; cursor: pointer; appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 10px center; background-size: 14px; }
+.form-group select:focus { border-color: var(--blue); background: #fff; }
+.modal-footer { margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px; }
+.btn { padding: 9px 18px; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; transition: 0.15s; }
+.btn-cancel { background: #f0f1f3; color: var(--text); }
+.btn-cancel:hover { background: #e4e5e8; }
+.btn-submit { background: var(--blue); color: #fff; }
+.btn-submit:hover { background: var(--blue-hover); }
+.main-content { flex: 1; display: flex; flex-direction: column; position: relative; width: 100%; min-width: 0; }
+.header { height: 56px; padding: 0 18px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid transparent; background: rgba(255,255,255,0.85); backdrop-filter: blur(6px); z-index: 10; transition: all 0.3s ease; }
+.header.compact { height: 46px; border-bottom: 1px solid var(--border); }
+.header.compact .school-logo { width: 24px; height: 24px; }
+.header.compact h1 { font-size: 14px; }
+.header-left { display: flex; align-items: center; gap: 10px; }
+.menu-toggle { background: none; border: none; cursor: pointer; color: var(--text); padding: 4px; display: flex; border-radius: 6px; }
+.menu-toggle:hover { background: #f0f1f3; }
+.school-logo { width: 30px; height: 30px; object-fit: contain; border-radius: 50%; border: 1px solid #eee; transition: 0.3s; }
+.header h1 { font-size: 15px; font-weight: 600; color: var(--primary); transition: 0.3s; }
+.chat-container { flex: 1; overflow-y: auto; padding: 16px 0; background: var(--bg); scroll-behavior: smooth; }
+.message-row { display: flex; max-width: 840px; margin: 0 auto; padding: 8px 18px; gap: 12px; align-items: flex-start; animation: msgIn 0.3s ease forwards; }
+@keyframes msgIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.message-row.user { flex-direction: row-reverse; }
+.message-row.user .avatar { background: linear-gradient(135deg, #10b981, #059669); color: #fff; }
+.message-row.user .bubble { background: linear-gradient(135deg, var(--user-from), var(--user-to)); color: #fff; border-radius: 16px 4px 16px 16px; padding: 10px 14px; max-width: 72%; }
+.message-row.ai { flex-direction: row; }
+.message-row.ai .avatar { background: #fff; border: 1px solid var(--border); overflow: hidden; }
+.message-row.ai .avatar img { width: 100%; height: 100%; object-fit: cover; }
+.message-row.ai .bubble { background: var(--ai-bg); border-radius: 4px 16px 16px 16px; padding: 14px 16px; max-width: 82%; box-shadow: var(--shadow); border: 1px solid rgba(0,0,0,0.04); }
+.avatar { width: 32px; height: 32px; border-radius: 8px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; }
+.bubble { font-size: 14px; line-height: 1.75; overflow-x: auto; word-wrap: break-word; }
+.bubble img { max-width: 48%; width: auto; height: auto; border-radius: 8px; margin: 4px 1%; display: inline-block; vertical-align: top; object-fit: cover; cursor: pointer; transition: transform 0.2s; }
+.bubble img:hover { transform: scale(1.02); }
+@media (max-width: 480px) { .bubble img { max-width: 100%; margin: 6px 0; display: block; } }
+.bubble table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 13px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
+.bubble th { background: #f0f5ff; padding: 8px 10px; text-align: left; color: var(--blue); font-weight: 600; white-space: nowrap; border-bottom: 2px solid var(--border); }
+.bubble td { padding: 8px 10px; border-bottom: 1px solid var(--border); }
+.bubble tr:nth-child(even) { background: #fafbfc; }
+.bubble tr:hover td { background: #eef4ff; }
+.bubble pre { background: #1e293b; color: #e2e8f0; padding: 14px; border-radius: 8px; overflow-x: auto; margin: 10px 0; font-size: 13px; }
+.bubble code { font-family: "SF Mono", "Fira Code", Consolas, monospace; }
+.bubble ul, .bubble ol { padding-left: 20px; margin: 10px 0; }
+.bubble li { margin-bottom: 4px; }
+.bubble :not(pre) > code { background: #f0f1f3; padding: 2px 5px; border-radius: 4px; font-size: 12px; color: #e53e3e; }
+.typing-dots { display: flex; gap: 5px; padding: 6px 0; }
+.typing-dots span { width: 7px; height: 7px; background: #999; border-radius: 50%; animation: bounce 1.4s infinite ease-in-out; }
+.typing-dots span:nth-child(2) { animation-delay: 0.16s; }
+.typing-dots span:nth-child(3) { animation-delay: 0.32s; }
+@keyframes bounce { 0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; } 40% { transform: scale(1); opacity: 1; } }
+.input-area { background: var(--bg); padding: 14px 18px 16px; }
+.input-wrapper { max-width: 800px; margin: 0 auto; position: relative; }
+.input-box { background: #fff; border: 1px solid #d4d6da; border-radius: 14px; display: flex; padding: 6px 10px 6px 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.04); align-items: center; transition: 0.2s; }
+.input-box:focus-within { border-color: var(--blue); box-shadow: 0 2px 8px rgba(22,119,255,0.12); }
+.input-box input { flex: 1; border: none; outline: none; font-size: 14px; background: transparent; padding: 8px 0; }
+.send-btn { background: var(--blue); color: #fff; border: none; width: 34px; height: 34px; border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; flex-shrink: 0; }
+.send-btn:hover:not(:disabled) { background: var(--blue-hover); }
+.send-btn:disabled { background: #e2e5ea; cursor: not-allowed; }
+.send-btn svg { width: 16px; height: 16px; fill: currentColor; }
+.disclaimer { text-align: center; font-size: 11px; color: #999; margin-top: 8px; }
+.welcome-screen { max-width: 760px; margin: 32px auto; text-align: center; padding: 20px; }
+.welcome-screen h2 { color: var(--primary); margin-bottom: 18px; font-size: 22px; }
+.quick-tags { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.tag-btn { background: #fff; border: 1px solid var(--border); padding: 8px 14px; border-radius: 18px; color: var(--text); cursor: pointer; transition: 0.15s; font-size: 13px; }
+.tag-btn:hover { border-color: var(--blue); color: var(--blue); background: var(--blue-light); }
+.lightbox-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 2000; align-items: center; justify-content: center; cursor: zoom-out; }
+.lightbox-overlay.active { display: flex; }
+.lightbox-overlay img { max-width: 92vw !important; max-height: 92vh !important; width: auto !important; margin: 0 !important; border-radius: 8px; box-shadow: 0 8px 30px rgba(0,0,0,0.5); display: block !important; }
+.doc-container { display: none; flex: 1; overflow-y: auto; padding: 28px 18px; background: #fff; }
+.doc-content { max-width: 840px; margin: 0 auto; color: var(--text); }
+.doc-content video, .doc-content iframe { max-width: 100%; border-radius: 8px; box-shadow: var(--shadow); margin: 14px 0; }
+.doc-content h1, .doc-content h2, .doc-content h3 { color: var(--primary); margin-top: 22px; margin-bottom: 10px; }
+.doc-content table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 13px; }
+.doc-content th { background: #f0f5ff; padding: 8px 10px; text-align: left; color: var(--blue); font-weight: 600; border: 1px solid var(--border); }
+.doc-content td { padding: 8px 10px; border: 1px solid var(--border); }
+@media (max-width: 768px) {
+    .sidebar { position: fixed; margin-left: calc(var(--sidebar-w) * -1); height: 100%; box-shadow: 4px 0 12px rgba(0,0,0,0.05); }
+    .sidebar.active { margin-left: 0; }
+    .sidebar-overlay.active { display: block; }
+    .message-row { max-width: 100%; padding: 8px 10px; gap: 8px; }
+    .message-row.user .bubble { max-width: 85%; }
+    .message-row.ai .bubble { max-width: 90%; padding: 10px 12px; }
+    .input-area { padding: 10px; }
+    .map-modal-box { height: 70vh; }
+}
+    </style>
+</head>
+<body>
+    <div class="lightbox-overlay" id="lightbox" onclick="closeLightbox()"></div>
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
+    <div class="modal-overlay" id="scoreModal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M18 9l-5 5-4-4-4 4"/></svg>
+                    精准分数查询
+                </h3>
+                <button class="close-btn" onclick="closeScoreModal()">&times;</button>
+            </div>
+            <div class="form-group">
+                <label for="provinceSelect">生源所在省份</label>
+                <select id="provinceSelect">
+                    <option value="河南" selected>河南 (本省)</option>
+                    <option value="北京">北京</option><option value="上海">上海</option>
+                    <option value="天津">天津</option><option value="重庆">重庆</option>
+                    <option value="河北">河北</option><option value="山西">山西</option>
+                    <option value="辽宁">辽宁</option><option value="吉林">吉林</option>
+                    <option value="黑龙江">黑龙江</option><option value="江苏">江苏</option>
+                    <option value="浙江">浙江</option><option value="安徽">安徽</option>
+                    <option value="福建">福建</option><option value="江西">江西</option>
+                    <option value="山东">山东</option><option value="湖北">湖北</option>
+                    <option value="湖南">湖南</option><option value="广东">广东</option>
+                    <option value="海南">海南</option><option value="四川">四川</option>
+                    <option value="贵州">贵州</option><option value="云南">云南</option>
+                    <option value="陕西">陕西</option><option value="甘肃">甘肃</option>
+                    <option value="青海">青海</option><option value="内蒙古">内蒙古</option>
+                    <option value="广西">广西</option><option value="西藏">西藏</option>
+                    <option value="宁夏">宁夏</option><option value="新疆">新疆</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="yearSelect">招生年份</label>
+                <select id="yearSelect">
+                    <option value="2025" selected>2025年</option>
+                    <option value="2024">2024年</option><option value="2023">2023年</option>
+                    <option value="2022">2022年</option><option value="2021">2021年</option>
+                </select>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-cancel" onclick="closeScoreModal()">取消</button>
+                <button class="btn btn-submit" onclick="submitScoreModal()">查询数据</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="mapModal">
+        <div class="modal-box map-modal-box">
+            <div class="modal-header">
+                <h3>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                    ZUA 校园地图
+                </h3>
+                <button class="close-btn" onclick="closeMapModal()">&times;</button>
+            </div>
+            <div id="amapContainer" style="flex: 1; width: 100%; border-radius: 8px; border: 1px solid var(--border);"></div>
+        </div>
+    </div>
+
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <button class="new-chat-btn" onclick="startNewChat()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+                新建咨询
+            </button>
+        </div>
+        <nav class="nav-menu">
+            <div class="nav-group-title">热门问题百科</div>
+            <a class="nav-item" onclick="sendQuery('你们学校有哪些航空特色专业？请推荐几个。')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
+                优势专业推荐
+            </a>
+            <a class="nav-item" onclick="openScoreModal()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M18 9l-5 5-4-4-4 4"/></svg>
+                历年分数查询
+            </a>
+            <a class="nav-item" onclick="sendQuery('请介绍一下宿舍条件、几人间、有空调吗？')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
+                寝室环境
+            </a>
+            <a class="nav-item" onclick="sendQuery('学校的奖学金、助学金政策是怎样的？')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="7"></circle><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"></polyline></svg>
+                奖助学金政策
+            </a>
+            <div class="nav-group-title">官方指南</div>
+            <a class="nav-item" onclick="openMapModal()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                校园地图
+            </a>
+            <a href="https://zsxxw.zua.edu.cn" target="_blank" class="nav-item">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                访问招生信息网
+            </a>
+            <div class="nav-group-title">友情链接</div>
+            <a class="nav-item" onclick="loadMarkdownDocument('brochure.md', '招生章程')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                招生章程
+            </a>
+            <a class="nav-item" onclick="loadMarkdownDocument('videos.md', '映像郑航')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect><line x1="7" y1="2" x2="7" y2="22"></line><line x1="17" y1="2" x2="17" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line><line x1="2" y1="7" x2="7" y2="7"></line><line x1="2" y1="17" x2="7" y2="17"></line><line x1="17" y1="17" x2="22" y2="17"></line><line x1="17" y1="7" x2="22" y2="7"></line></svg>
+                映像郑航
+            </a>
+            <a href="https://wiki.zua.fan" target="_blank" class="nav-item">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+                郑航百科全书
+            </a>
+        </nav>
+    </aside>
+
+    <main class="main-content">
+        <header class="header" id="mainHeader">
+            <div class="header-left">
+                <button class="menu-toggle" onclick="toggleSidebar()">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                </button>
+                <img src="./img.png" alt="ZUA Logo" class="school-logo">
+                <h1>ZUA 招生智能问答助手</h1>
+            </div>
+        </header>
+        <div class="chat-container" id="chatbox">
+            <div class="welcome-screen" id="welcomeScreen">
+                <h2>欢迎咨询郑州航院</h2>
+                <div class="quick-tags">
+                    <button class="tag-btn" onclick="openScoreModal()">历年分数查询</button>
+                    <button class="tag-btn" onclick="sendQuery('计算机科学与技术专业属于哪个学院？')">王牌专业解读</button>
+                    <button class="tag-btn" onclick="sendQuery('介绍一下学校')">介绍学校</button>
+                </div>
+            </div>
+        </div>
+        <div class="doc-container" id="docContainer">
+            <div id="docContent" class="doc-content"></div>
+        </div>
+        <div class="input-area" id="inputArea">
+            <div class="input-wrapper">
+                <div class="input-box">
+                    <input type="text" id="userInput" placeholder="输入你想了解的招生问题..." onkeypress="handleKeyPress(event)">
+                    <button class="send-btn" id="sendBtn" onclick="sendQuery()">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+                    </button>
+                </div>
+                <div class="disclaimer">AI 生成内容仅供参考，录取政策及分数线请以各省教育考试院及 ZUA 招生网为准。</div>
+            </div>
+        </div>
+    </main>
+
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <script src="./app.js?v=20260517c"></script>
+</body>
+</html>
