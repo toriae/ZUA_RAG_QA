@@ -43,7 +43,7 @@
 
 | 主界面 | 管理面板 |
 |:---:|:---:|
-| ![主界面](docs/images/界面.png) | ![管理面板](docs/images/管理面板.png) |
+| ![主界面](docs/images/界面.png) | 
 
 > 更多截图见 `docs/images/` 目录。
 
