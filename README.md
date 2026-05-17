@@ -317,6 +317,3 @@ A: 将新的 CSV 文件放入 `data/csv/` 目录，然后重新运行 `python3 -
 - [LanceDB](https://lancedb.com/) — 轻量级本地向量数据库
 - [Neo4j](https://neo4j.com/) — 图数据库
 
-## 许可
-
-本项目为课程作业，仅用于学习和演示。
